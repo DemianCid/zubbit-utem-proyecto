@@ -1,26 +1,39 @@
 # ==============================================================================
 # TIENDA DE PERIFÉRICOS GAMING: ZUBBIT
 # EVENTO ESPECIAL: Pack Setup Competitivo
-# Paradigma: Imperativo (Flujo secuencial plano de principio a fin sin funciones)
+# Paradigma: Imperativo integrado con la API de Shopify
 # ==============================================================================
 
+import os
+import sys
+
+# Solución al error de importación: permite encontrar 'api_shopify' desde la carpeta 'Paradigmas'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# 1. Importación de la clase de inventario de Shopify
+from api_shopify.conexion_shopify import ShopifyInventario
+
 # ------------------------------------------------------------------------------
-# 1. ESTADO INICIAL DEL SISTEMA (Catálogo, Precios Reales y Stock Exacto)
+# 1. ESTADO INICIAL DEL SISTEMA (Conexión a Shopify y Configuración de Catálogo)
 # ------------------------------------------------------------------------------
+# Conexión con Shopify y consulta en tiempo real del inventario
+shopify = ShopifyInventario()
+stock_remoto = shopify.consultar_stock()
+
 # Periférico 1: Mouse
 nombre_p1 = "Mouse Razer Viper V4 Pro"
 precio_p1 = 100000
-stock_p1 = 30
+stock_p1 = stock_remoto.get(nombre_p1, 30) if stock_remoto else 30
 
 # Periférico 2: Mousepad
-nombre_p2 = "Mousepad Artisan"
+nombre_p2 = "Mousepad Gamer Artisan"
 precio_p2 = 70000
-stock_p2 = 20
+stock_p2 = stock_remoto.get(nombre_p2, 20) if stock_remoto else 20
 
 # Periférico 3: Audífonos
-nombre_p3 = "Audífonos Cloud III"
+nombre_p3 = "Audífonos HyperX Cloud III"
 precio_p3 = 79990
-stock_p3 = 34
+stock_p3 = stock_remoto.get(nombre_p3, 34) if stock_remoto else 34
 
 # Porcentaje de descuento comercial del bundle (20%)
 PORCENTAJE_DESCUENTO_PACK = 0.20
@@ -30,7 +43,7 @@ precio_base_pack = precio_p1 + precio_p2 + precio_p3  # $249.990
 descuento_unit_pack = int(round(precio_base_pack * PORCENTAJE_DESCUENTO_PACK))  # $49.998
 precio_pack_con_descuento = precio_base_pack - descuento_unit_pack  # $199.992
 
-# Detección del límite de packs formables según el stock inicial disponible
+# Detección del límite de packs formables según el stock disponible en Shopify
 stock_max_packs = stock_p1
 if stock_p2 < stock_max_packs:
     stock_max_packs = stock_p2
@@ -66,7 +79,7 @@ print(" • Al comprar los 3 productos en conjunto (Bundle Competitivo), el sist
 print("   20% DE DESCUENTO AUTOMÁTICO sobre el valor total de cada pack completo.")
 print(" • La bonificación aplica de forma directa por cada trío completo conformado.")
 print(" • Unidades adicionales o sobrantes que no conformen un pack se liquidarán a precio de lista.")
-print(" • Venta supeditada estrictamente a la validación de existencias en almacén central.")
+print(" • Venta sincronizada con el stock en tiempo real de la tienda Shopify.")
 print(linea_simple)
 print("                            CATÁLOGO DE PRODUCTOS EN CAMPAÑA                            ")
 print(borde_tabla_cat)
@@ -96,10 +109,10 @@ while cant_p1 < 0 or cant_p1 > stock_p1:
         continue
     cant_p1 = int(entrada)
     if cant_p1 > stock_p1:
-        print(f"    [!] RECHAZADO: Stock insuficiente. La bodega solo dispone de {stock_p1} unidades.")
+        print(f"    [!] RECHAZADO: Stock insuficiente en bodega Shopify. Solo hay {stock_p1} unidades.")
         cant_p1 = -1
 
-# --- Captura secuencial: Periférico 2 (Mousepad Artisan) ---
+# --- Captura secuencial: Periférico 2 (Mousepad Gamer Artisan) ---
 cant_p2 = -1
 while cant_p2 < 0 or cant_p2 > stock_p2:
     entrada = input(f" -> Ingrese cantidad para [02] {nombre_p2} (Stock disponible: {stock_p2}): ").strip()
@@ -108,10 +121,10 @@ while cant_p2 < 0 or cant_p2 > stock_p2:
         continue
     cant_p2 = int(entrada)
     if cant_p2 > stock_p2:
-        print(f"    [!] RECHAZADO: Stock insuficiente. La bodega solo dispone de {stock_p2} unidades.")
+        print(f"    [!] RECHAZADO: Stock insuficiente en bodega Shopify. Solo hay {stock_p2} unidades.")
         cant_p2 = -1
 
-# --- Captura secuencial: Periférico 3 (Audífonos Cloud III) ---
+# --- Captura secuencial: Periférico 3 (Audífonos HyperX Cloud III) ---
 cant_p3 = -1
 while cant_p3 < 0 or cant_p3 > stock_p3:
     entrada = input(f" -> Ingrese cantidad para [03] {nombre_p3} (Stock disponible: {stock_p3}): ").strip()
@@ -120,7 +133,7 @@ while cant_p3 < 0 or cant_p3 > stock_p3:
         continue
     cant_p3 = int(entrada)
     if cant_p3 > stock_p3:
-        print(f"    [!] RECHAZADO: Stock insuficiente. La bodega solo dispone de {stock_p3} unidades.")
+        print(f"    [!] RECHAZADO: Stock insuficiente en bodega Shopify. Solo hay {stock_p3} unidades.")
         cant_p3 = -1
 
 # ------------------------------------------------------------------------------
@@ -199,7 +212,7 @@ else:
     print(linea_doble)
 
     # ------------------------------------------------------------------------------
-    # 6. CONFIRMACIÓN Y ACTUALIZACIÓN DE STOCK
+    # 6. CONFIRMACIÓN Y ACTUALIZACIÓN DE STOCK (Sincronización con Shopify)
     # ------------------------------------------------------------------------------
     respuesta = ""
     while respuesta not in ["S", "N"]:
@@ -212,13 +225,21 @@ else:
         stock_p2 = stock_p2 - cant_p2
         stock_p3 = stock_p3 - cant_p3
 
+        # Reducción de inventario en Shopify
+        print("\n[*] Sincronizando reducción de inventario con Shopify...")
+        shopify.reducir_stock_bundle({
+            nombre_p1: cant_p1,
+            nombre_p2: cant_p2,
+            nombre_p3: cant_p3
+        }, simular=True)
+
         print("\n" + ("*" * ancho_total))
         print("          ¡TRANSACCIÓN COMPLETADA CON ÉXITO EN ZUBBIT GAMING STORE!                     ")
         print("*" * ancho_total)
-        print("ESTADO ACTUALIZADO DEL INVENTARIO EN BODEGA CENTRAL:")
-        print(f" • [ID 01] {nombre_p1:<26}: {stock_p1:>2} unid. disponibles (Descargadas: {cant_p1})")
-        print(f" • [ID 02] {nombre_p2:<26}: {stock_p2:>2} unid. disponibles (Descargadas: {cant_p2})")
-        print(f" • [ID 03] {nombre_p3:<26}: {stock_p3:>2} unid. disponibles (Descargadas: {cant_p3})")
+        print("ESTADO ACTUALIZADO DEL INVENTARIO EN BODEGA CENTRAL (SHOPIFY):")
+        print(f" • [ID 01] {nombre_p1:<28}: {stock_p1:>2} unid. disponibles (Descargadas: {cant_p1})")
+        print(f" • [ID 02] {nombre_p2:<28}: {stock_p2:>2} unid. disponibles (Descargadas: {cant_p2})")
+        print(f" • [ID 03] {nombre_p3:<28}: {stock_p3:>2} unid. disponibles (Descargadas: {cant_p3})")
         print("*" * ancho_total)
     else:
         print("\n" + linea_simple)
